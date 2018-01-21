@@ -50,8 +50,8 @@ class Agent():
     return random.randrange(self.action_space) if random.random() < epsilon else self.act(state)
 
   def learn(self, mem):
-    idxs, states, actions, returns, next_states, nonterminals, weights = mem.sample(self.batch_size)
-    batch_size = len(idxs)  # May return less than specified if invalid transitions sampled
+    states, actions, returns, next_states, nonterminals = mem.sample(self.batch_size)
+    batch_size = len(states)  # May return less than specified if invalid transitions sampled
 
     # Calculate current state probabilities
     ps = self.policy_net(states)  # Probabilities p(s_t, ·; θpolicy)
@@ -80,11 +80,9 @@ class Agent():
 
     loss = -torch.sum(Variable(m) * ps_a.log(), 1)  # Cross-entropy loss (minimises Kullback-Leibler divergence)
     self.policy_net.zero_grad()
-    (weights * loss).mean().backward()  # Importance weight losses
+    loss.mean().backward()  # Importance weight losses
     nn.utils.clip_grad_norm(self.policy_net.parameters(), self.max_gradient_norm)  # Clip gradients (normalising by max value of gradient L2 norm)
     self.optimiser.step()
-
-    mem.update_priorities(idxs, loss.data.abs().pow(self.priority_exponent))  # Update priorities of sampled transitions
 
   def update_target_net(self):
     self.target_net.load_state_dict(self.policy_net.state_dict())

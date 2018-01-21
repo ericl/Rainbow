@@ -6,7 +6,7 @@ Rainbow: Combining Improvements in Deep Reinforcement Learning [[1]](#references
 
 - [x] DQN [[2]](#references)
 - [x] Double DQN [[3]](#references)
-- [x] Prioritised Experience Replay [[4]](#references)
+- [ ] Prioritised Experience Replay [[4]](#references)
 - [x] Dueling Network Architecture [[5]](#references)
 - [x] Multi-step Returns [[6]](#references)
 - [x] Distributional RL [[7]](#references)
