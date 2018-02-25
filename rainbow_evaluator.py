@@ -1,4 +1,5 @@
 import os
+from threading import Lock
 
 import numpy as np
 import torch
@@ -34,6 +35,7 @@ class RainbowEvaluator(Evaluator):
         self.local_timestep = 0
         self.episode_rewards = [0.0]
         self.episode_lengths = [0.0]
+        self.lock = Lock()
 
     def sample(self):
         obs, actions, rewards, new_obs, dones = [], [], [], [], []
@@ -87,16 +89,19 @@ class RainbowEvaluator(Evaluator):
         return self.agent.apply_grad(grads)
 
     def compute_apply(self, samples):
-        return self.agent.compute_apply(samples)
+        with self.lock:
+            return self.agent.compute_apply(samples)
 
     def get_weights(self):
-        out = {}
-        for k, v in self.agent.policy_net.state_dict().items():
-            out[k] = v.cpu()
-        return out
+        with self.lock:
+            out = {}
+            for k, v in self.agent.policy_net.state_dict().items():
+                out[k] = v.cpu()
+            return out
 
     def set_weights(self, weights):
         self.agent.policy_net.load_state_dict(weights)
+        self.agent.target_net.load_state_dict(weights)
 
     def stats(self):
         mean_100ep_reward = round(np.mean(self.episode_rewards[-101:-1]), 5)
