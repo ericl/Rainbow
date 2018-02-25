@@ -63,7 +63,8 @@ DEFAULT_CONFIG = dict(
     num_workers=1,
     # Max number of steps to delay synchronizing weights of workers.
     max_weight_sync_delay=400,
-    num_replay_buffer_shards=1)
+    num_replay_buffer_shards=1,
+    force_remote_evaluators=False)
 
 
 class RainbowRLlibAgent(Agent):
@@ -77,8 +78,7 @@ class RainbowRLlibAgent(Agent):
         self.remote_evaluators = [
             remote_cls.remote(self.config)
             for i in range(self.config["num_workers"])]
-        # TODO(ekl)
-        if self.config["num_workers"] > 4:
+        if self.config["force_remote_evaluators"]:
             _, self.remote_evaluators = split_colocated(
                 self.remote_evaluators)
         optimizer_config = {
