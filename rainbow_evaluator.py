@@ -5,6 +5,7 @@ import torch
 from torch.autograd import Variable
 
 from ray.rllib.dqn.dqn_evaluator import adjust_nstep
+from ray.rllib.dqn.common.atari_wrappers import wrap_deepmind
 from ray.rllib.optimizers.evaluator import Evaluator
 from ray.rllib.optimizers.sample_batch import SampleBatch, pack
 
@@ -15,7 +16,7 @@ from main import parse_args
 
 class RainbowEvaluator(Evaluator):
     
-    def __init__(self, config):
+    def __init__(self, config, env_creator):
         self.config = config
         self.config.update(config)
         self.args = parse_args([
@@ -24,11 +25,12 @@ class RainbowEvaluator(Evaluator):
             "--lr={}".format(self.config["lr"]),
             "--game={}".format(self.config["env"]),
         ])
-        self.env = Env(self.args)
-        self.env.train()
-        self.action_space = self.env.action_space()
-        self.agent = Agent(self.args, self.env)
-        self.state = self.env.reset().cpu().numpy()
+        self.env = wrap_deepmind(
+            env_creator(self.config["env_config"]),
+            frame_stack=True, scale=True)
+        self.action_space = self.env.action_space.n
+        self.agent = Agent(self.args, self.action_space)
+        self.state = self.env.reset().transpose((2,0,1))
         self.local_timestep = 0
         self.episode_rewards = [0.0]
         self.episode_lengths = [0.0]
@@ -38,8 +40,8 @@ class RainbowEvaluator(Evaluator):
         for _ in range(
                 self.config["sample_batch_size"] + self.config["n_step"] - 1):
             action = self.agent.act(Variable(torch.from_numpy(self.state)))
-            next_state, reward, done = self.env.step(action)
-            next_state = next_state.cpu().numpy()
+            next_state, reward, done, _ = self.env.step(action)
+            next_state = next_state.transpose((2,0,1))
             obs.append(self.state)
             actions.append(action)
             rewards.append(reward)
@@ -49,7 +51,7 @@ class RainbowEvaluator(Evaluator):
             self.episode_rewards[-1] += reward
             self.episode_lengths[-1] += 1
             if done:
-                self.env.reset()
+                self.state = self.env.reset().transpose((2,0,1))
                 self.agent.reset_noise()
                 self.episode_rewards.append(0.0)
                 self.episode_lengths.append(0.0)

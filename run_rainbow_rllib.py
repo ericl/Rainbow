@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import multiprocessing
 import sys
 
 import ray
@@ -19,13 +20,13 @@ else:
 run_experiments({
     "rainbow-apex-pong": {
         "run": "RainbowApex",
-        "env": "pong",
+        "env": "PongNoFrameskip-v4",
         "resources": {
             "cpu": lambda spec: spec.config.num_workers,
             "gpu": 1,
         },
         "config": {
-            "num_workers": 8 if smoke_test else 32,
+            "num_workers": multiprocessing.cpu_count() if smoke_test else 64,
             "lr": .0001,
             "n_step": 3,
             "gamma": 0.99,

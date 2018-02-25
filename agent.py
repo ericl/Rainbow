@@ -11,8 +11,8 @@ from model import DQN
 
 
 class Agent():
-  def __init__(self, args, env):
-    self.action_space = env.action_space()
+  def __init__(self, args, action_space):
+    self.action_space = action_space
     self.atoms = args.atoms
     self.Vmin = args.V_min
     self.Vmax = args.V_max

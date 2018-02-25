@@ -73,10 +73,10 @@ class RainbowRLlibAgent(Agent):
     _default_config = DEFAULT_CONFIG
 
     def _init(self):
-        self.local_evaluator = RainbowEvaluator(self.config)
+        self.local_evaluator = RainbowEvaluator(self.config, self.env_creator)
         remote_cls = ray.remote(num_cpus=1)(RainbowEvaluator)
         self.remote_evaluators = [
-            remote_cls.remote(self.config)
+            remote_cls.remote(self.config, self.env_creator)
             for i in range(self.config["num_workers"])]
         if self.config["force_remote_evaluators"]:
             _, self.remote_evaluators = split_colocated(
