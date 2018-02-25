@@ -28,7 +28,7 @@ class RainbowEvaluator(Evaluator):
         self.env.train()
         self.action_space = self.env.action_space()
         self.agent = Agent(self.args, self.env)
-        self.state = self.env.reset().numpy()
+        self.state = self.env.reset().cpu().numpy()
         self.local_timestep = 0
         self.episode_rewards = [0.0]
         self.episode_lengths = [0.0]
@@ -39,7 +39,7 @@ class RainbowEvaluator(Evaluator):
                 self.config["sample_batch_size"] + self.config["n_step"] - 1):
             action = self.agent.act(Variable(torch.from_numpy(self.state)))
             next_state, reward, done = self.env.step(action)
-            next_state = next_state.numpy()
+            next_state = next_state.cpu().numpy()
             obs.append(self.state)
             actions.append(action)
             rewards.append(reward)

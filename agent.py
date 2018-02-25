@@ -96,7 +96,7 @@ class Agent():
     self.policy_net.zero_grad()
     (sample_batch["weights"] * loss).mean().backward()
     nn.utils.clip_grad_norm(self.policy_net.parameters(), self.max_gradient_norm)  # Clip gradients (normalising by max value of gradient L2 norm)
-    return [p.grad.data.numpy() for p in self.policy_net.parameters()], loss.abs().data.numpy()
+    return [p.grad.data.cpu().numpy() for p in self.policy_net.parameters()], loss.abs().data.cpu().numpy()
 
   def apply_grad(self, grads):
     if type(grads) is tuple:
@@ -108,7 +108,7 @@ class Agent():
 
   def compute_td_error(self, sample_batch):
     loss = self.compute_loss(sample_batch)
-    return loss.abs().data.numpy()
+    return loss.abs().data.cpu().numpy()
 
   def learn(self, mem):
     idxs, states, actions, returns, next_states, nonterminals, weights = mem.sample(self.batch_size)
