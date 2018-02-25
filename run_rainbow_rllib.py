@@ -8,9 +8,13 @@ from ray.tune import register_trainable, run_experiments
 from rainbow_rllib_agent import RainbowRLlibAgent
 
 register_trainable("RainbowApex", RainbowRLlibAgent)
-ray.init(num_gpus=1)
 
 smoke_test = len(sys.argv) > 1 and sys.argv[1] == "--smoke"
+
+if smoke_test:
+    ray.init(num_gpus=1)
+else:
+    ray.init(redis_address="localhost:6379")
 
 run_experiments({
     "rainbow-apex-pong": {
