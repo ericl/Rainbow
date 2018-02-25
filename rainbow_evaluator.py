@@ -85,12 +85,10 @@ class RainbowEvaluator(Evaluator):
         return self.agent.apply_grad(grads)
 
     def compute_apply(self, samples):
-        grads, td_error = self.compute_gradients(samples)
-        self.apply_gradients(grads)
-        return td_error
+        return self.agent.compute_apply(samples)
 
     def get_weights(self):
-        return self.agent.policy_net.state_dict()
+        return self.agent.policy_net.cpu().state_dict()
 
     def set_weights(self, weights):
         self.agent.policy_net.load_state_dict(weights)

@@ -63,6 +63,13 @@ class Agent():
             np.ones_like(sample_batch["dones"]) - sample_batch["dones"]
         ).unsqueeze(1).float())
 
+    if torch.cuda.is_available():
+        states = states.cuda()
+        actions = actions.cuda()
+        returns = returns.cuda()
+        next_states = next_states.cuda()
+        nonterminals = nonterminals.cuda()
+
     # Calculate current state probabilities
     ps = self.policy_net(states)  # Probabilities p(s_t, ·; θpolicy)
     ps_a = ps[range(batch_size), actions]  # p(s_t, a_t; θpolicy)
@@ -105,6 +112,14 @@ class Agent():
     for g, p in zip(grads, self.policy_net.parameters()):
         p.grad = Variable(torch.from_numpy(g))
     self.optimiser.step()
+
+  def compute_apply(self, sample_batch):
+    loss = self.compute_loss(sample_batch)
+    self.policy_net.zero_grad()
+    (sample_batch["weights"] * loss).mean().backward()
+    nn.utils.clip_grad_norm(self.policy_net.parameters(), self.max_gradient_norm)  # Clip gradients (normalising by max value of gradient L2 norm)
+    self.optimiser.step()
+    return loss.abs().data.cpu().numpy()
 
   def compute_td_error(self, sample_batch):
     loss = self.compute_loss(sample_batch)
