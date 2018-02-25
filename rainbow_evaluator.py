@@ -88,7 +88,10 @@ class RainbowEvaluator(Evaluator):
         return self.agent.compute_apply(samples)
 
     def get_weights(self):
-        return self.agent.policy_net.cpu().state_dict()
+        out = {}
+        for k, v in self.agent.policy_net.state_dict().items():
+            out[k] = v.cpu()
+        return out
 
     def set_weights(self, weights):
         self.agent.policy_net.load_state_dict(weights)
