@@ -4,12 +4,15 @@ import argparse
 import random
 import torch
 from torch.autograd import Variable
+import gym
 
 from agent import Agent
 from env import Env
 from memory import ReplayMemory
 from test import test
 import sys
+
+from ray.rllib.dqn.common.atari_wrappers import wrap_deepmind
 
 
 parser = argparse.ArgumentParser(description='Rainbow')
@@ -56,6 +59,11 @@ def parse_args(params=None):
     args.cuda = torch.cuda.is_available() and not args.disable_cuda
     return args
 
+
+def to_rainbow(obs):
+    return Variable(torch.from_numpy(obs.transpose((2,0,1))))
+
+
 if __name__ == '__main__':
     args = parse_args()
     random.seed(args.seed)
@@ -64,9 +72,9 @@ if __name__ == '__main__':
       torch.cuda.manual_seed(random.randint(1, 10000))
 
     # Environment
-    env = Env(args)
-    env.train()
-    action_space = env.action_space()
+    env = wrap_deepmind(
+        gym.make(args.game), frame_stack=True, scale=True)
+    action_space = env.action_space.n
 
 
     # Agent
@@ -80,11 +88,12 @@ if __name__ == '__main__':
     T, done = 0, True
     while T < args.evaluation_size - args.history_length + 1:
       if done:
-        state, done = env.reset(), False
+        state, done = to_rainbow(env.reset()), False
         val_mem.preappend()  # Set up memory for beginning of episode
 
       val_mem.append(state, None, None)
-      state, _, done = env.step(random.randint(0, action_space - 1))
+      state, _, done, _ = env.step(random.randint(0, action_space - 1))
+      state = to_rainbow(state)
       T += 1
       # No need to postappend on done in validation memory
 
@@ -99,13 +108,14 @@ if __name__ == '__main__':
       T, done = 0, True
       while T < args.T_max:
         if done:
-          state, done = Variable(env.reset()), False
+          state, done = to_rainbow(env.reset()), False
           dqn.reset_noise()  # Draw a new set of noisy weights for each episode (better for before learning starts)
           mem.preappend()  # Set up memory for beginning of episode
 
         action = dqn.act(state)  # Choose an action greedily (with noisy weights)
 
-        next_state, reward, done = env.step(action)  # Step
+        next_state, reward, done, _ = env.step(action)  # Step
+        next_state = to_rainbow(next_state)
         if args.reward_clip > 0:
           reward = max(min(reward, args.reward_clip), -args.reward_clip)  # Clip rewards
         T += 1
@@ -132,7 +142,7 @@ if __name__ == '__main__':
         if T % args.log_interval == 0:
           print('T = ' + str(T) + ' / ' + str(args.T_max))
 
-        state = Variable(next_state)
+        state = next_state
         if done:
           mem.postappend()  # Store empty transitition at end of episode
     env.close()
