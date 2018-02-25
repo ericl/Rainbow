@@ -1,5 +1,6 @@
 import os
 import random
+import numpy as np
 import torch
 from torch import nn, optim
 from torch.autograd import Variable
@@ -48,6 +49,64 @@ class Agent():
   # Acts with an ε-greedy policy
   def act_e_greedy(self, state, epsilon=0.001):
     return random.randrange(self.action_space) if random.random() < epsilon else self.act(state)
+
+  def compute_loss(self, sample_batch):
+    batch_size = sample_batch.count
+    states, actions, returns, next_states, nonterminals = (
+        Variable(torch.from_numpy(np.array(sample_batch["obs"]))),
+        torch.from_numpy(np.array(sample_batch["actions"])),
+        torch.from_numpy(np.array(sample_batch["rewards"])).float(),
+        Variable(torch.from_numpy(np.array(sample_batch["new_obs"]))),
+        torch.from_numpy(
+            np.ones_like(sample_batch["dones"]) - sample_batch["dones"]
+        ).unsqueeze(1).float())
+
+    # Calculate current state probabilities
+    ps = self.policy_net(states)  # Probabilities p(s_t, ·; θpolicy)
+    ps_a = ps[range(batch_size), actions]  # p(s_t, a_t; θpolicy)
+
+    # Calculate nth next state probabilities
+    pns = self.policy_net(next_states).data  # Probabilities p(s_t+n, ·; θpolicy)
+    dns = self.support.expand_as(pns) * pns  # Distribution d_t+n = (z, p(s_t+n, ·; θpolicy))
+    argmax_indices_ns = dns.sum(2).max(1)[1]  # Perform argmax action selection using policy network: argmax_a[(z, p(s_t+n, a; θpolicy))]
+    pns = self.target_net(next_states).data  # Probabilities p(s_t+n, ·; θtarget)
+    pns_a = pns[range(batch_size), argmax_indices_ns]  # Double-Q probabilities p(s_t+n, argmax_a[(z, p(s_t+n, a; θpolicy))]; θtarget)
+    pns_a *= nonterminals  # Set p = 0 for terminal nth next states as all possible expected returns = expected reward at final transition
+
+    # Compute Tz (Bellman operator T applied to z)
+    Tz = returns.unsqueeze(1) + nonterminals * (self.discount ** self.n) * self.support.unsqueeze(0)  # Tz = R^n + (γ^n)z (accounting for terminal states)
+    Tz = Tz.clamp(min=self.Vmin, max=self.Vmax)  # Clamp between supported values
+    # Compute L2 projection of Tz onto fixed support z
+    b = (Tz - self.Vmin) / self.delta_z  # b = (Tz - Vmin) / Δz
+    l, u = b.floor().long(), b.ceil().long()
+
+    # Distribute probability of Tz
+    m = states.data.new(batch_size, self.atoms).zero_()
+    offset = torch.linspace(0, ((batch_size - 1) * self.atoms), batch_size).long().unsqueeze(1).expand(batch_size, self.atoms).type_as(actions)
+    m.view(-1).index_add_(0, (l + offset).view(-1), (pns_a * (u.float() - b)).view(-1))  # m_l = m_l + p(s_t+n, a*)(u - b)
+    m.view(-1).index_add_(0, (u + offset).view(-1), (pns_a * (b - l.float())).view(-1))  # m_u = m_u + p(s_t+n, a*)(b - l)
+
+    loss = -torch.sum(Variable(m) * ps_a.log(), 1)  # Cross-entropy loss (minimises Kullback-Leibler divergence)
+    return loss
+
+  def grad(self, sample_batch):
+    loss = self.compute_loss(sample_batch)
+    self.policy_net.zero_grad()
+    (sample_batch["weights"] * loss).mean().backward()
+    nn.utils.clip_grad_norm(self.policy_net.parameters(), self.max_gradient_norm)  # Clip gradients (normalising by max value of gradient L2 norm)
+    return [p.grad.data.numpy() for p in self.policy_net.parameters()], loss.abs().data.numpy()
+
+  def apply_grad(self, grads):
+    if type(grads) is tuple:
+        grads, _ = grads  # drop td_error
+    self.optimiser.zero_grad()
+    for g, p in zip(grads, self.policy_net.parameters()):
+        p.grad = Variable(torch.from_numpy(g))
+    self.optimiser.step()
+
+  def compute_td_error(self, sample_batch):
+    loss = self.compute_loss(sample_batch)
+    return loss.abs().data.numpy()
 
   def learn(self, mem):
     idxs, states, actions, returns, next_states, nonterminals, weights = mem.sample(self.batch_size)
