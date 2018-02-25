@@ -116,7 +116,10 @@ class Agent():
   def compute_apply(self, sample_batch):
     loss = self.compute_loss(sample_batch)
     self.policy_net.zero_grad()
-    (sample_batch["weights"] * loss).mean().backward()
+    weights = Variable(torch.from_numpy(sample_batch["weights"]).float())
+    if torch.cuda.is_available():
+        weights = weights.cuda()
+    (weights * loss).mean().backward()
     nn.utils.clip_grad_norm(self.policy_net.parameters(), self.max_gradient_norm)  # Clip gradients (normalising by max value of gradient L2 norm)
     self.optimiser.step()
     return loss.abs().data.cpu().numpy()
