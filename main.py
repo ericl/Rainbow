@@ -10,6 +10,7 @@ from agent import Agent
 from env import Env
 from memory import ReplayMemory
 from test import test
+from test import to_rainbow
 import sys
 
 from ray.rllib.dqn.common.atari_wrappers import wrap_deepmind
@@ -58,14 +59,6 @@ def parse_args(params=None):
       print(' ' * 26 + k + ': ' + str(v))
     args.cuda = torch.cuda.is_available() and not args.disable_cuda
     return args
-
-
-def to_rainbow(obs):
-    tensor = torch.from_numpy(obs.transpose((2,0,1)))
-    if torch.cuda.is_available():
-        return Variable(tensor.cuda())
-    else:
-        return Variable(tensor)
 
 
 if __name__ == '__main__':
@@ -135,8 +128,8 @@ if __name__ == '__main__':
 
           if T % args.evaluation_interval == 0:
             dqn.eval()  # Set DQN (policy network) to evaluation mode
-            avg_reward, avg_Q = test(args, T, dqn, val_mem)  # Test
-            print('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
+            avg_reward = test(args, T, dqn, val_mem)  # Test
+            print('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward))
             dqn.train()  # Set DQN (policy network) back to training mode
 
         # Update target network

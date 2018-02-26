@@ -1,22 +1,30 @@
 # -*- coding: utf-8 -*-
 
 import os
+import gym
 import plotly
 from plotly.graph_objs import Scatter, Line
 import torch
 from torch.autograd import Variable
 
 from env import Env
+from ray.rllib.dqn.common.atari_wrappers import wrap_deepmind
 
 
 # Globals
 Ts, rewards, Qs = [], [], []
 
+def to_rainbow(obs, volatile=False):
+    tensor = torch.from_numpy(obs.transpose((2,0,1)))
+    if torch.cuda.is_available():
+        return Variable(tensor.cuda(), volatile)
+    else:
+        return Variable(tensor, volatile)
 
 # Test DQN
 def test(args, T, dqn, val_mem, evaluate=False):
-  env = Env(args)
-  env.eval()
+  env = wrap_deepmind(
+      gym.make(args.game), frame_stack=True, scale=True)
   Ts.append(T)
   T_rewards, T_Qs = [], []
 
@@ -25,11 +33,11 @@ def test(args, T, dqn, val_mem, evaluate=False):
   for _ in range(args.evaluation_episodes):
     while True:
       if done:
-        state, reward_sum, done = Variable(env.reset(), volatile=True), 0, False
+        state, reward_sum, done = to_rainbow(env.reset(), volatile=True), 0, False
 
       action = dqn.act_e_greedy(state)  # Choose an action ε-greedily
-      state, reward, done = env.step(action)  # Step
-      state = Variable(state, volatile=True)
+      state, reward, done, _ = env.step(action)  # Step
+      state = to_rainbow(state, volatile=True)
       reward_sum += reward
       if args.render:
         env.render()
@@ -39,24 +47,8 @@ def test(args, T, dqn, val_mem, evaluate=False):
         break
   env.close()
 
-  # Test Q-values over validation memory
-  for state in val_mem:  # Iterate over valid states
-    T_Qs.append(dqn.evaluate_q(state))
-
-  if not evaluate:
-    # Append to results
-    rewards.append(T_rewards)
-    Qs.append(T_Qs)
-
-    # Plot
-    _plot_line(Ts, rewards, 'Reward', path='results')
-    _plot_line(Ts, Qs, 'Q', path='results')
-
-    # Save model weights
-    dqn.save('results')
-
   # Return average reward and Q-value
-  return sum(T_rewards) / len(T_rewards), sum(T_Qs) / len(T_Qs)
+  return sum(T_rewards) / len(T_rewards)
 
 
 # Plots min, max and mean + standard deviation bars of a population over time
