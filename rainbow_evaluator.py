@@ -15,6 +15,14 @@ from env import Env
 from main import parse_args
 
 
+def to_rainbow(obs):
+    tensor = torch.from_numpy(obs.transpose((2,0,1)))
+    if torch.cuda.is_available():
+        return Variable(tensor.cuda())
+    else:
+        return Variable(tensor)
+
+
 class RainbowEvaluator(Evaluator):
     
     def __init__(self, config, env_creator):
@@ -31,7 +39,7 @@ class RainbowEvaluator(Evaluator):
             frame_stack=True, scale=True)
         self.action_space = self.env.action_space.n
         self.agent = Agent(self.args, self.action_space)
-        self.state = self.env.reset().transpose((2,0,1))
+        self.state = to_rainbow(self.env.reset())
         self.local_timestep = 0
         self.episode_rewards = [0.0]
         self.episode_lengths = [0.0]
@@ -41,19 +49,19 @@ class RainbowEvaluator(Evaluator):
         obs, actions, rewards, new_obs, dones = [], [], [], [], []
         for _ in range(
                 self.config["sample_batch_size"] + self.config["n_step"] - 1):
-            action = self.agent.act(Variable(torch.from_numpy(self.state)))
+            action = self.agent.act(self.state)
             next_state, reward, done, _ = self.env.step(action)
-            next_state = next_state.transpose((2,0,1))
-            obs.append(self.state)
+            next_state = to_rainbow(next_state)
+            obs.append(self.state.data.cpu().numpy())
             actions.append(action)
             rewards.append(reward)
-            new_obs.append(next_state)
+            new_obs.append(next_state.data.cpu().numpy())
             dones.append(1.0 if done else 0.0)
             self.state = next_state
             self.episode_rewards[-1] += reward
             self.episode_lengths[-1] += 1
             if done:
-                self.state = self.env.reset().transpose((2,0,1))
+                self.state = to_rainbow(self.env.reset())
                 self.agent.reset_noise()
                 self.episode_rewards.append(0.0)
                 self.episode_lengths.append(0.0)

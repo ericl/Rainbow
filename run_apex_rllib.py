@@ -8,7 +8,7 @@ from ray.tune import register_trainable, run_experiments
 
 from rainbow_rllib_agent import RainbowRLlibAgent
 
-register_trainable("RainbowApex", RainbowRLlibAgent)
+register_trainable("Rainbow", RainbowRLlibAgent)
 
 smoke_test = len(sys.argv) > 1 and sys.argv[1] == "--smoke"
 
@@ -19,19 +19,19 @@ else:
 
 run_experiments({
     "rainbow-apex-pong": {
-        "run": "RainbowApex",
+        "run": "Rainbow",
         "env": "PongNoFrameskip-v4",
         "resources": {
             "cpu": lambda spec: spec.config.num_workers,
             "gpu": 1,
         },
         "config": {
-            "num_workers": 0,  #multiprocessing.cpu_count() if smoke_test else 64,
-            "apex": False,
+            "num_workers": multiprocessing.cpu_count() if smoke_test else 64,
+            "apex": True,
             "lr": .0001,
             "n_step": 3,
             "gamma": 0.99,
-            "sample_batch_size": 4, # 50,
+            "sample_batch_size": 50,
             "train_batch_size": 32,
             "max_weight_sync_delay": 400,
             "num_replay_buffer_shards": 4,
