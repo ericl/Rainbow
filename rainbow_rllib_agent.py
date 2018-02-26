@@ -9,7 +9,7 @@ import numpy as np
 from torch.autograd import Variable
 
 import ray
-from ray.rllib.optimizers import LocalSyncOptimizer
+from ray.rllib.optimizers.local_sync_replay import LocalSyncReplayOptimizer
 from ray.rllib.optimizers.apex_optimizer import ApexOptimizer, split_colocated
 from ray.rllib.agent import Agent
 from ray.tune.result import TrainingResult
@@ -64,7 +64,8 @@ DEFAULT_CONFIG = dict(
     # Max number of steps to delay synchronizing weights of workers.
     max_weight_sync_delay=400,
     num_replay_buffer_shards=1,
-    force_remote_evaluators=False)
+    force_remote_evaluators=False,
+    apex=False)
 
 
 class RainbowRLlibAgent(Agent):
@@ -81,26 +82,12 @@ class RainbowRLlibAgent(Agent):
         if self.config["force_remote_evaluators"]:
             _, self.remote_evaluators = split_colocated(
                 self.remote_evaluators)
-        optimizer_config = {
-            "buffer_size": self.config["buffer_size"],
-            "prioritized_replay": self.config["prioritized_replay"],
-            "prioritized_replay_alpha":
-                self.config["prioritized_replay_alpha"],
-            "prioritized_replay_beta":
-                self.config["prioritized_replay_beta"],
-            "prioritized_replay_eps":
-                self.config["prioritized_replay_eps"],
-            "learning_starts": self.config["learning_starts"],
-            "max_weight_sync_delay": self.config["max_weight_sync_delay"],
-            "sample_batch_size": self.config["sample_batch_size"],
-            "train_batch_size": self.config["train_batch_size"],
-            "num_replay_buffer_shards":
-                self.config["num_replay_buffer_shards"],
-        }
-
-        self.optimizer = ApexOptimizer(
-            optimizer_config, self.local_evaluator,
-            self.remote_evaluators)
+        if self.config["apex"]:
+            self.optimizer = ApexOptimizer(
+                self.config, self.local_evaluator, self.remote_evaluators)
+        else:
+            self.optimizer = LocalSyncReplayOptimizer(
+                self.config, self.local_evaluator, self.remote_evaluators)
 
         self.global_timestep = 0
         self.last_target_update_ts = 0

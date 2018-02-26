@@ -26,7 +26,8 @@ run_experiments({
             "gpu": 1,
         },
         "config": {
-            "num_workers": multiprocessing.cpu_count() if smoke_test else 64,
+            "num_workers": 0,  #multiprocessing.cpu_count() if smoke_test else 64,
+            "apex": False,
             "lr": .0001,
             "n_step": 3,
             "gamma": 0.99,
