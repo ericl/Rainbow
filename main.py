@@ -61,7 +61,11 @@ def parse_args(params=None):
 
 
 def to_rainbow(obs):
-    return Variable(torch.from_numpy(obs.transpose((2,0,1))))
+    tensor = torch.from_numpy(obs.transpose((2,0,1)))
+    if torch.cuda.is_available():
+        return Variable(tensor.cuda())
+    else:
+        return Variable(tensor)
 
 
 if __name__ == '__main__':
