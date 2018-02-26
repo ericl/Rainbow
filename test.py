@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 
 import os
-import gym
 import plotly
 from plotly.graph_objs import Scatter, Line
 import torch
 from torch.autograd import Variable
 
 from env import Env
-from ray.rllib.dqn.common.atari_wrappers import wrap_deepmind
+from ray.rllib.dqn.common.atari_wrappers import wrap_deepmind, make_atari
 
 
 # Globals
@@ -24,7 +23,7 @@ def to_rainbow(obs, volatile=False):
 # Test DQN
 def test(args, T, dqn, val_mem, evaluate=False):
   env = wrap_deepmind(
-      gym.make(args.game), frame_stack=True, scale=True)
+      make_atari(args.game), frame_stack=True, scale=True)
   Ts.append(T)
   T_rewards, T_Qs = [], []
 

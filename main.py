@@ -4,7 +4,6 @@ import argparse
 import random
 import torch
 from torch.autograd import Variable
-import gym
 
 from agent import Agent
 from env import Env
@@ -13,7 +12,7 @@ from test import test
 from test import to_rainbow
 import sys
 
-from ray.rllib.dqn.common.atari_wrappers import wrap_deepmind
+from ray.rllib.dqn.common.atari_wrappers import wrap_deepmind, make_atari
 
 
 parser = argparse.ArgumentParser(description='Rainbow')
@@ -70,7 +69,7 @@ if __name__ == '__main__':
 
     # Environment
     env = wrap_deepmind(
-        gym.make(args.game), frame_stack=True, scale=True)
+        make_atari(args.game), frame_stack=True, scale=True)
     action_space = env.action_space.n
 
 
